@@ -49,15 +49,15 @@ public class DatabaseGenerator {
     private static int pocetCertifikacnychFiriem;
     private static int pocetDbVerzii;
     private static final ArrayList< String > rodneCislaBuffer = new ArrayList<>( POCET_OSOB );
-    private static final ArrayList< String > datumyPonukaneSkuskyBuffer = new ArrayList<>( POCET_PONUKANYCH_SKUSOK );
     private static final ArraySet dodatocnePodmienkyBuffer = new ArraySet();
+    private static final ArraySet ponukaneSkuskyBuffer = new ArraySet();
     
     public static void main( String[] args ) {
         bringTheTide();
     }
     
     public static void bringTheTide() { // fill the database
-        
+        System.out.println( DELETE_TABLES );
         generateTableKrajina();
         generateTableMesto();
         generateTableOsoba();
@@ -77,7 +77,7 @@ public class DatabaseGenerator {
         generateTableAlternativySkusky();
         generateTablePrerekvizity();
         generateTableDodatocnePodmienky();
-        generateTableSplnenieDodatocnejSkusky();
+        generateTableSplnenieDodatocnejPodmienky();
     }
        
     private static String getPSC() {
@@ -216,16 +216,16 @@ public class DatabaseGenerator {
     private static void printInsertOsoba( String rodneCislo, int idMesta, String ulica, String meno, String priezvisko ) {
         System.out.println( 
                 "INSERT INTO osoba(rod_cislo, id_mesta, ulica, meno, priezvisko) VALUES(" 
-                        + rodneCislo 
-                        + ", '" 
+                        + getProperFormatForPrint( rodneCislo )
+                        + ", " 
                         + idMesta 
-                        + "', '" 
-                        + ulica 
-                        + "', '" 
-                        + meno 
-                        + "', '" 
-                        + priezvisko 
-                        + "');" 
+                        + ", " 
+                        + getProperFormatForPrint( ulica )
+                        + ", " 
+                        + getProperFormatForPrint( meno )
+                        + ", " 
+                        + getProperFormatForPrint( priezvisko )
+                        + ");" 
         );
     }
     
@@ -270,13 +270,21 @@ public class DatabaseGenerator {
         if( string.equals( "NULL" ) ) {
             return "NULL";
         }
+        else if( string.substring( 0, string.length() < 7 ? string.length() : 7 ).equals( "TO_DATE" ) ) {
+            return string;
+        }
         else {
             return "'" + string + "'";
         }
     }
     
     private static String getRandomEmail() {
-        return getRandomName( false ) + "." + getRandomSurname( false ) + gen.nextInt(1000) +"@gmail.com";
+        String email;
+        do{
+            email = getRandomName( false ) + "." + getRandomSurname( false ) + gen.nextInt(100) +"@gmail.com";
+        }
+        while( email.length() > 27 );
+        return email;
     }
     
     private static String getRandomTelephoneNumber() {
@@ -333,7 +341,7 @@ public class DatabaseGenerator {
             return "NULL";
         }
         else {
-            return getRandomWords( 12 );
+            return getRandomWords( 10 );
         }
     }
     
@@ -343,7 +351,7 @@ public class DatabaseGenerator {
             return "NULL";
         }
         else {
-            return getRandomWords( 12 );
+            return getRandomWords( 8 );
         }
     }
     
@@ -519,21 +527,8 @@ public class DatabaseGenerator {
     private static void generateTableCertifikat() {
         System.out.println( "\n--### Generujem Certifikaty ###\n" );
         
-        ArraySet uniqueCertificates = new ArraySet();
-        Object[] certificate;
-        for( int certificateNumber = 1; certificateNumber <= POCET_CERTIFIKATOV; ) {
-
-            certificate = new Object[]{ certificateNumber, getRandomIdLevelu(), getRandomIdTypuCertifikatu(), getRandomIdVerzie() };
-            if( uniqueCertificates.insert( certificate ) ) {
-                certificateNumber++;
-            }
-
+        for( int certificateNumber = 1; certificateNumber <= POCET_CERTIFIKATOV; certificateNumber++ ) {
             printInsertCertifikat( certificateNumber, getRandomIdLevelu(), getRandomIdTypuCertifikatu(), getRandomIdVerzie(),
-                    getRandomDobaPlatnostiCertifikatu() );
-        }
-        
-        for( Object[] uniqueCertificate : uniqueCertificates) {
-            printInsertCertifikat( (int)uniqueCertificate[ 0 ], (int)uniqueCertificate[ 1 ], (int)uniqueCertificate[ 2 ], (int)uniqueCertificate[ 3 ],
                     getRandomDobaPlatnostiCertifikatu() );
         }
     }
@@ -583,7 +578,7 @@ public class DatabaseGenerator {
         }
         
         for( Object[] unikatnaPonukanaSkuska : unikatnePonukaneSkusky) {
-            datumyPonukaneSkuskyBuffer.add( (String)unikatnaPonukanaSkuska[ 3 ] );
+            if( ponukaneSkuskyBuffer.insert( unikatnaPonukanaSkuska ) == false ) throw new RuntimeException( "Je to v piči" );
             printInsertPonukaneSkusky( (int)unikatnaPonukanaSkuska[ 0 ], (int)unikatnaPonukanaSkuska[ 1 ], (int)unikatnaPonukanaSkuska[ 2 ],
                     (String)unikatnaPonukanaSkuska[ 3 ], getRandomUmiestenieFirmy(), getRandomNumber( 10, 50 ), getRandomNumber( 50, 500 ) );
         }
@@ -644,15 +639,14 @@ public class DatabaseGenerator {
         
         ArraySet unikatneRegistracieNaSkusku = new ArraySet();
         Object[] registrovanaSkuska;
-        
+        Object[] ponukanaSkuska;
         for( int registrationNumber = 1; registrationNumber <= POCET_REGISTRACII_NA_SKUSKU;  ) {
-            registrovanaSkuska = new Object[]{ getRandomRodneCisloFromBuffer(), getRandomIdMesta(), getRandomIdFirmy(), getRandomIdFirmy(),
-                    getRandomDatumPonukanychSkusokFromBuffer() };
+            ponukanaSkuska = getRandomPonukanuSkuskuFromBuffer();
+            registrovanaSkuska = new Object[]{ getRandomRodneCisloFromBuffer(), (int)ponukanaSkuska[ 1 ], (int)ponukanaSkuska[ 2 ],
+                (int)ponukanaSkuska[ 0 ], (String)ponukanaSkuska[ 3 ] };
             if( unikatneRegistracieNaSkusku.insert( registrovanaSkuska ) ) {
                 registrationNumber++;
             }
-            printInsertRegistraciaNaSkusku( getRandomRodneCisloFromBuffer(), getRandomIdMesta(), getRandomIdFirmy(), getRandomIdFirmy(),
-                    getRandomDatumPonukanychSkusokFromBuffer(), getRandomDateString( 2014, 2014), "NULL", "NULL", "NULL", "NULL" );
         }
         
         for( Object[] unikatnaRegistraciaNaSkusku : unikatneRegistracieNaSkusku) {
@@ -666,8 +660,8 @@ public class DatabaseGenerator {
         return rodneCislaBuffer.get( gen.nextInt( rodneCislaBuffer.size() ) );
     }
     
-    private static String getRandomDatumPonukanychSkusokFromBuffer() {
-        return datumyPonukaneSkuskyBuffer.get( gen.nextInt( datumyPonukaneSkuskyBuffer.size() ) );
+    private static Object[] getRandomPonukanuSkuskuFromBuffer() {
+        return ponukaneSkuskyBuffer.get( gen.nextInt( ponukaneSkuskyBuffer.size() ) );
     }
     
     private static void printInsertRegistraciaNaSkusku( String rodneCislo, int idMesta, int idFirmy, int idSkusky, String datumSkusky,
@@ -705,12 +699,10 @@ public class DatabaseGenerator {
         Object[] vydanyCertifikat;
         
         for( int certificateNumber = 1; certificateNumber <= POCET_VYDANYCH_CERTIFIKATOV;  ) {
-            vydanyCertifikat = new Object[]{ getRandomIdTypuCertifikatu(), getRandomRodneCisloFromBuffer() };
+            vydanyCertifikat = new Object[]{ getRandomIdTypuCertifikatu(), getRandomRodneCisloFromBuffer()};
             if( unikatneVydaneCertifikaty.insert( vydanyCertifikat ) ) {
                 certificateNumber++;
             }
-            printInsertVydanyCertifikat( getRandomIdTypuCertifikatu(), getRandomRodneCisloFromBuffer(),
-                    getRandomDateString( 2005, 2013), getRandomDateString( 2014, 2018 ) );
         }
         
         for( Object[] unikatnyVydanyCertifikat : unikatneVydaneCertifikaty ) {
@@ -903,7 +895,7 @@ public class DatabaseGenerator {
         );
     }
     
-    private static void generateTableSplnenieDodatocnejSkusky() {
+    private static void generateTableSplnenieDodatocnejPodmienky() {
         System.out.println( "\n--### Generujem Splnenia dodatočných skúšok ###\n" );
         
         ArraySet unikatneSplneniaDodatocnejSkusky = new ArraySet();
@@ -919,7 +911,7 @@ public class DatabaseGenerator {
         }
         
         for( Object[] unikatneSplnenieDodatocnejSkusky : unikatneSplneniaDodatocnejSkusky ) {
-            printInsertSplnenieDodatocnejSkusky( (int)unikatneSplnenieDodatocnejSkusky[ 0 ], (int)unikatneSplnenieDodatocnejSkusky[ 1 ],
+            printInsertSplnenieDodatocnejPodmienky( (int)unikatneSplnenieDodatocnejSkusky[ 0 ], (int)unikatneSplnenieDodatocnejSkusky[ 1 ],
                     (String)unikatneSplnenieDodatocnejSkusky[ 2 ] );
         }
     }
@@ -928,9 +920,9 @@ public class DatabaseGenerator {
         return dodatocnePodmienkyBuffer.get( gen.nextInt( POCET_DODATOCNYCH_PODMIENOK ) );
     }
     
-    private static void printInsertSplnenieDodatocnejSkusky( int idCertifikatu, int idTypuPodmienky, String rodneCislo ) {
+    private static void printInsertSplnenieDodatocnejPodmienky( int idCertifikatu, int idTypuPodmienky, String rodneCislo ) {
         System.out.println( 
-                "INSERT INTO splnenie_dodatocnej_skusky(id_certifikatu, id_typu_podmienky, rod_cislo) VALUES(" 
+                "INSERT INTO splnenie_dodatocnej_podmienky(id_certifikatu, id_typu_podmienky, rod_cislo) VALUES(" 
                         + idCertifikatu
                         + ", " 
                         + idTypuPodmienky
@@ -939,4 +931,24 @@ public class DatabaseGenerator {
                         + ");" 
         );
     }
+    private static final String DELETE_TABLES = "delete from SPLNENIE_DODATOCNEJ_PODMIENKY;"
+            + "\ndelete from DODATOCNE_PODMIENKY;"
+            + "\ndelete from prerekvizity;"
+            + "\ndelete from VYDANY_CERTIFIKAT;"
+            + "\ndelete from alternativy_skusky;"
+            + "\ndelete from certifikat;"
+            + "\ndelete from typ_certifikatu;"
+            + "\ndelete from db_verzia;"
+            + "\ndelete from cert_level;"
+            + "\ndelete from predchadzajuce_skusky;"
+            + "\ndelete from okruh_tem;"
+            + "\ndelete from tema;"
+            + "\ndelete from REGISTRACIA_NA_SKUSKU;"
+            + "\ndelete from ponukane_skusky;"
+            + "\ndelete from skuska;"
+            + "\ndelete from certifikacna_firma;"
+            + "\ndelete from osoba;"
+            + "\ndelete from mesto;"
+            + "\ndelete from typ_dodatocnej_podmienky;"
+            + "\ndelete from krajina;";
 }

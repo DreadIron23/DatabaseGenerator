@@ -30,6 +30,10 @@ public class ArraySet implements Iterable< Object[] > {
     public Object[] get( int index ) {
         return container.get( index );
     }
+    
+    public int size() {
+        return container.size();
+    }
 
     @Override
     public Iterator<Object[]> iterator() {
