@@ -26,6 +26,7 @@ public class DatabaseGenerator {
     
     /*SETTERS*/
     private static final int POCET_OSOB = 500;
+    private static final int POCET_MIEST = 25;
     private static final int POCET_SKUSOK = 100;
     private static final int POCET_TEM = 30;
     private static final int POCET_VERZII_DB_OD = 6;
@@ -39,15 +40,16 @@ public class DatabaseGenerator {
     private static final int POCET_VYDANYCH_CERTIFIKATOV = 100;
     private static final int POCET_OKRUHOV_TEM = 300;
     private static final int POCET_ALTERNATIV_SKUSOK = 100;
-    private static final int POCET_PREREKVIZIT = 5;
-    private static final int POCET_DODATOCNYCH_PODMIENOK = 10;
-    private static final int POCET_SPLNENYCH_DODATOCNYCH_PODMIENOK = 100;
-    private static final int POCET_PREDCHADZAJUCICH_SKUSOK = 10;
+    private static final int POCET_PREREKVIZIT = 10;
+    private static final int POCET_DODATOCNYCH_PODMIENOK = 50;
+    private static final int POCET_SPLNENYCH_DODATOCNYCH_PODMIENOK = 200;
+    private static final int POCET_PREDCHADZAJUCICH_SKUSOK = 150;
     
     /*Variables*/
-    private static int pocetMiest;
+ //   private static int pocetMiest;
     private static int pocetCertifikacnychFiriem;
     private static int pocetDbVerzii;
+    private static final ArrayList< String > idMiestBuffer = new ArrayList<>( POCET_MIEST );
     private static final ArrayList< String > rodneCislaBuffer = new ArrayList<>( POCET_OSOB );
     private static final ArraySet dodatocnePodmienkyBuffer = new ArraySet();
     private static final ArraySet ponukaneSkuskyBuffer = new ArraySet();
@@ -107,11 +109,21 @@ public class DatabaseGenerator {
     private static void generateTableMesto() {
         System.out.println( "\n--### Generujem mestá ###\n" );
         
-        int counter = 1;
-        for( String town : TOWNS) {
-            printInsertMesto( counter++, 1, town, getPSC() );
+        LinkedHashSet< String > unikatneMesta = new LinkedHashSet<>();
+        for( int townNumber = 1; townNumber <= POCET_MIEST;  ) {
+            if( unikatneMesta.add( getRandomMesto() ) ) {
+                townNumber++;
+            }
         }
-        pocetMiest = counter - 1;
+        
+        int counter = 0;
+        for( String unikatneMesto : unikatneMesta) {
+            printInsertMesto( ++counter, 1, unikatneMesto, getPSC() );
+        }
+    }
+    
+    private static String getRandomMesto() {
+        return TOWNS[ gen.nextInt( TOWNS.length ) ];
     }
     
     private static void printInsertMesto( int idMesta, int idKrajiny, String nazovMesta, String pscMesta ) {
@@ -153,7 +165,7 @@ public class DatabaseGenerator {
     }
     
     private static int getRandomIdMesta() {
-        return gen.nextInt( pocetMiest ) + 1;
+        return gen.nextInt( POCET_MIEST ) + 1;
     }
     
     private static String getRandomStreet() {
@@ -829,17 +841,38 @@ public class DatabaseGenerator {
     private static void generateTablePrerekvizity() {
         System.out.println( "\n--### Generujem Prerekvizity ###\n" );
         
+        printBeginningOfPlsqlBlock();
+        
         ArraySet unikatnePrerekvizity = new ArraySet();
         Object[] prerekvizita;
         
         for( int prerequestNumber = 1; prerequestNumber <= POCET_PREREKVIZIT;  ) {
             int firstId;
             int secondId;
+            boolean done = false;
             do {                
                 firstId = getRandomIdCertifikatu();
                 secondId = getRandomIdCertifikatu();
             }
             while( firstId == secondId );
+            
+            while( !done ) {
+                do { // eliminácia rovnakých ID
+                    firstId = getRandomIdCertifikatu();
+                    secondId = getRandomIdCertifikatu();
+                }
+                while( firstId == secondId );
+                int count = 0;
+                for( Object[] unikatnaPrerekvizita : unikatnePrerekvizity) { //prerekvizita uz je zaradena pod inym certifikatom
+                    if( (int)unikatnaPrerekvizita[ 1 ] == secondId ) {
+                        count++;
+                    }
+                }
+                if( count == 0 ) {
+                    done = true;
+                }
+            }
+            
             
             prerekvizita = new Object[]{ firstId, secondId };
             if( unikatnePrerekvizity.insert( prerekvizita ) ) {
@@ -848,8 +881,23 @@ public class DatabaseGenerator {
         }
         
         for( Object[] unikatnaPrerekvizita : unikatnePrerekvizity ) {
-            printInsertPrerekvizity( (int)unikatnaPrerekvizita[ 0 ], (int)unikatnaPrerekvizita[ 1 ] );
+            printPlsqlPrerekvizity( (int)unikatnaPrerekvizita[ 0 ], (int)unikatnaPrerekvizita[ 1 ] );
         }
+        
+        printEndOfPlsqlBlock();
+    }
+    
+    private static void printBeginningOfPlsqlBlock() {
+        System.out.println( "SET SERVEROUTPUT ON;"
+                + "\nDECLARE  myVar NUMBER(16);\n"
+                + "\nBEGIN"
+        );
+    }
+    
+    private static void printEndOfPlsqlBlock() {
+        System.out.println( "END;"
+                + "\n/"
+        );
     }
     
     private static void printInsertPrerekvizity( int idCertifikatu, int idPredchodcu ) {
@@ -859,6 +907,13 @@ public class DatabaseGenerator {
                         + ", " 
                         + idPredchodcu
                         + ");" 
+        );
+    }
+    
+    private static void printPlsqlPrerekvizity( int idCertifikatu, int idPredchodcu ) {
+        System.out.println( 
+                "  myVar:=ADD_PREREKVIZITY( " + idCertifikatu + ", " + idPredchodcu + " );"
+                        + "\n  IF myVar > 0 THEN dbms_output.put_line('Output code: ' || myVar); END IF;"
         );
     }
     
@@ -882,7 +937,7 @@ public class DatabaseGenerator {
     }
     
     private static int getRandomIdTypuPodmienky() {
-        return gen.nextInt( POCET_DODATOCNYCH_PODMIENOK ) + 1;
+        return gen.nextInt( POCET_TYPOV_DODATOCNYCH_PODMIENOK ) + 1;
     }
     
     private static void printInsertDodatocnePodmienky( int idCertifikatu, int idTypuPodmienky ) {
